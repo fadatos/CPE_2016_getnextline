@@ -1,0 +1,1192 @@
+ncurses(3NCURSES)                                            ncurses(3NCURSES)
+
+
+
+NAME
+       ncurses - CRT screen handling and optimization package
+
+SYNOPSIS
+       #include <ncurses/curses.h>
+
+DESCRIPTION
+       The  ncurses  library  routines  give  the  user a terminal-independent
+       method of updating  character  screens  with  reasonable  optimization.
+       This  implementation  is  “new  curses”  (ncurses)  and is the approved
+       replacement for 4.4BSD classic curses,  which  has  been  discontinued.
+       This describes ncurses version 6.0 (patch 20160813).
+
+       The  ncurses  library emulates the curses library of System V Release 4
+       UNIX, and XPG4 (X/Open Portability Guide) curses  (also  known  as  XSI
+       curses).   XSI  stands  for  X/Open  System  Interfaces Extension.  The
+       ncurses library is freely redistributable in source form.   Differences
+       from  the SVr4 curses are summarized under the EXTENSIONS and PORTABIL-
+       ITY sections below and described in detail  in  the  respective  EXTEN-
+       SIONS, PORTABILITY and BUGS sections of individual man pages.
+
+       The  ncurses  library  also provides many useful extensions, i.e., fea-
+       tures which cannot be implemented by a simple add-on library but  which
+       require access to the internals of the library.
+
+       A  program  using  these  routines  must  be  linked with the -lncurses
+       option, or (if it  has  been  generated)  with  the  debugging  library
+       -lncurses_g.   (Your  system  integrator  may also have installed these
+       libraries under the names  -lcurses  and  -lcurses_g.)   The  ncurses_g
+       library  generates  trace logs (in a file called 'trace' in the current
+       directory) that describe curses  actions.   See  also  the  section  on
+       ALTERNATE CONFIGURATIONS.
+
+       The  ncurses package supports: overall screen, window and pad manipula-
+       tion; output to windows and pads; reading terminal input; control  over
+       terminal  and  curses  input and output options; environment query rou-
+       tines; color manipulation; use of soft label keys;  terminfo  capabili-
+       ties; and access to low-level terminal-manipulation routines.
+
+   Initialization
+       The  library uses the locale which the calling program has initialized.
+       That is normally done with setlocale:
+
+             setlocale(LC_ALL, "");
+
+       If the locale is not initialized, the library assumes  that  characters
+       are  printable  as in ISO-8859-1, to work with certain legacy programs.
+       You should initialize the locale and not rely on  specific  details  of
+       the library when the locale has not been setup.
+
+       The  function  initscr  or  newterm  must  be  called to initialize the
+       library before any of the other routines that  deal  with  windows  and
+       screens are used.  The routine endwin must be called before exiting.
+
+       To  get  character-at-a-time  input  without echoing (most interactive,
+       screen oriented programs want this), the following sequence  should  be
+       used:
+
+             initscr(); cbreak(); noecho();
+
+       Most programs would additionally use the sequence:
+
+             nonl();
+             intrflush(stdscr, FALSE);
+             keypad(stdscr, TRUE);
+
+       Before a curses program is run, the tab stops of the terminal should be
+       set and its initialization strings, if defined, must be  output.   This
+       can be done by executing the tput init command after the shell environ-
+       ment variable TERM has been exported.  tset(1) is  usually  responsible
+       for doing this.  [See terminfo(5) for further details.]
+
+   Datatypes
+       Beware:  the  terminal  your program is running may or may not have the
+       features you expect. Ncurses makes no attempt to check  available  fea-
+       tures in advance. This is upon the programmer.
+
+       The  ncurses  library  permits  manipulation of data structures, called
+       windows, which can be thought of as two-dimensional arrays  of  charac-
+       ters representing all or part of a CRT screen.  A default window called
+       stdscr, which is the size of the terminal screen, is supplied.   Others
+       may be created with newwin.
+
+       Note  that  curses  does not handle overlapping windows, that's done by
+       the panel(3CURSES) library.  This means that you can either use  stdscr
+       or  divide  the  screen into tiled windows and not using stdscr at all.
+       Mixing the two will result in unpredictable, and undesired, effects.
+
+       Windows are referred to by variables declared as WINDOW *.  These  data
+       structures  are  manipulated with routines described here and elsewhere
+       in the ncurses manual pages.  Among those, the most basic routines  are
+       move  and  addch.  More general versions of these routines are included
+       with names beginning with w, allowing the user  to  specify  a  window.
+       The routines not beginning with w affect stdscr.
+
+       After using routines to manipulate a window, refresh is called, telling
+       curses to make the user's CRT screen look like stdscr.  The  characters
+       in a window are actually of type chtype, (character and attribute data)
+       so that other information about the character may also be  stored  with
+       each character.
+
+       Special windows called pads may also be manipulated.  These are windows
+       which are not constrained to the size of the screen and whose  contents
+       need  not be completely displayed.  See pad(3NCURSES) for more informa-
+       tion.
+
+       In addition to drawing characters on the screen, video  attributes  and
+       colors  may  be  supported,  causing  the characters to show up in such
+       modes as underlined, in reverse video, or in color  on  terminals  that
+       support  such  display  enhancements.   Line  drawing characters may be
+       specified to be output.  On input, curses is  also  able  to  translate
+       arrow and function keys that transmit escape sequences into single val-
+       ues.  The video attributes, line drawing characters, and  input  values
+       use  names,  defined  in  <curses.h>, such as A_REVERSE, ACS_HLINE, and
+       KEY_LEFT.
+
+   Environment variables
+       If the environment variables LINES and COLUMNS are set, or if the  pro-
+       gram  is executing in a window environment, line and column information
+       in the environment will override information read  by  terminfo.   This
+       would affect a program running in an AT&T 630 layer, for example, where
+       the size of a screen is changeable (see ENVIRONMENT).
+
+       If the environment variable TERMINFO  is  defined,  any  program  using
+       curses  checks  for  a local terminal definition before checking in the
+       standard place.  For example, if TERM is set to att4424, then the  com-
+       piled terminal definition is found in
+
+             /usr/share/terminfo/a/att4424.
+
+       (The  a is copied from the first letter of att4424 to avoid creation of
+       huge directories.)  However,  if  TERMINFO  is  set  to  $HOME/myterms,
+       curses first checks
+
+             $HOME/myterms/a/att4424,
+
+       and if that fails, it then checks
+
+             /usr/share/terminfo/a/att4424.
+
+       This  is  useful  for developing experimental definitions or when write
+       permission in /usr/share/terminfo is not available.
+
+       The integer variables LINES and COLS are defined in <curses.h> and will
+       be  filled  in  by  initscr with the size of the screen.  The constants
+       TRUE and FALSE have the values 1 and 0, respectively.
+
+       The curses routines also define the WINDOW * variable curscr  which  is
+       used  for  certain  low-level  operations like clearing and redrawing a
+       screen containing garbage.  The curscr can be used in only a  few  rou-
+       tines.
+
+   Routine and Argument Names
+       Many  curses routines have two or more versions.  The routines prefixed
+       with w require a window argument.  The routines prefixed with p require
+       a pad argument.  Those without a prefix generally use stdscr.
+
+       The  routines  prefixed with mv require a y and x coordinate to move to
+       before performing the appropriate action.  The mv routines imply a call
+       to  move before the call to the other routine.  The coordinate y always
+       refers to the row (of the window), and x always refers to  the  column.
+       The upper left-hand corner is always (0,0), not (1,1).
+
+       The  routines prefixed with mvw take both a window argument and x and y
+       coordinates.  The window argument is always specified before the  coor-
+       dinates.
+
+       In  each case, win is the window affected, and pad is the pad affected;
+       win and pad are always pointers to type WINDOW.
+
+       Option setting routines require a Boolean flag bf with the  value  TRUE
+       or  FALSE;  bf  is always of type bool.  Most of the data types used in
+       the library routines, such as WINDOW,  SCREEN,  bool,  and  chtype  are
+       defined  in  <curses.h>.   Types used for the terminfo routines such as
+       TERMINAL are defined in <term.h>.
+
+       This manual page describes functions which may appear in any configura-
+       tion  of  the  library.   There  are  two  common configurations of the
+       library:
+
+          ncurses
+               the "normal" library, which handles 8-bit characters.  The nor-
+               mal  (8-bit) library stores characters combined with attributes
+               in chtype data.
+
+               Attributes alone (no corresponding character) may be stored  in
+               chtype or the equivalent attr_t data.  In either case, the data
+               is stored in something like an integer.
+
+               Each cell (row and column) in a WINDOW is stored as a chtype.
+
+          ncursesw
+               the so-called "wide" library, which handles  multibyte  charac-
+               ters (see the section on ALTERNATE CONFIGURATIONS).  The "wide"
+               library includes all of the calls from  the  "normal"  library.
+               It adds about one third more calls using data types which store
+               multibyte characters:
+
+               cchar_t
+                    corresponds to chtype.  However it is a structure, because
+                    more  data  is  stored  than can fit into an integer.  The
+                    characters are large enough  to  require  a  full  integer
+                    value - and there may be more than one character per cell.
+                    The video attributes and  color  are  stored  in  separate
+                    fields of the structure.
+
+                    Each  cell  (row  and  column)  in a WINDOW is stored as a
+                    cchar_t.
+
+               wchar_t
+                    stores a "wide" character.  Like chtype, this  may  be  an
+                    integer.
+
+               wint_t
+                    stores  a  wchar_t or WEOF - not the same, though both may
+                    have the same size.
+
+               The "wide" library provides new functions which  are  analogous
+               to  functions  in the "normal" library.  There is a naming con-
+               vention which relates many of the normal/wide variants: a  "_w"
+               is  inserted  into  the  name.   For  example,  waddch  becomes
+               wadd_wch.
+
+   Routine Name Index
+       The following table lists each curses routine and the name of the  man-
+       ual  page  on  which  it  is  described.  Routines flagged with `*' are
+       ncurses-specific, not described by XPG4 or present in SVr4.
+
+                  curses Routine Name     Manual Page Name
+                  ──────────────────────────────────────────────────
+                  COLOR_PAIR              color(3NCURSES)
+                  PAIR_NUMBER             attr(3NCURSES)
+                  _nc_free_and_exit       memleaks(3NCURSES)*
+                  _nc_freeall             memleaks(3NCURSES)*
+                  _nc_tracebits           trace(3NCURSES)*
+                  _traceattr              trace(3NCURSES)*
+                  _traceattr2             trace(3NCURSES)*
+                  _tracechar              trace(3NCURSES)*
+                  _tracechtype            trace(3NCURSES)*
+                  _tracechtype2           trace(3NCURSES)*
+                  _tracedump              trace(3NCURSES)*
+                  _tracef                 trace(3NCURSES)*
+                  _tracemouse             trace(3NCURSES)*
+                  add_wch                 add_wch(3NCURSES)
+                  add_wchnstr             add_wchstr(3NCURSES)
+                  add_wchstr              add_wchstr(3NCURSES)
+                  addch                   addch(3NCURSES)
+                  addchnstr               addchstr(3NCURSES)
+                  addchstr                addchstr(3NCURSES)
+                  addnstr                 addstr(3NCURSES)
+                  addnwstr                addwstr(3NCURSES)
+                  addstr                  addstr(3NCURSES)
+                  addwstr                 addwstr(3NCURSES)
+                  assume_default_colors   default_colors(3NCURSES)*
+                  attr_get                attr(3NCURSES)
+                  attr_off                attr(3NCURSES)
+                  attr_on                 attr(3NCURSES)
+                  attr_set                attr(3NCURSES)
+                  attroff                 attr(3NCURSES)
+
+                  attron                  attr(3NCURSES)
+                  attrset                 attr(3NCURSES)
+                  baudrate                termattrs(3NCURSES)
+                  beep                    beep(3NCURSES)
+                  bkgd                    bkgd(3NCURSES)
+                  bkgdset                 bkgd(3NCURSES)
+                  bkgrnd                  bkgrnd(3NCURSES)
+                  bkgrndset               bkgrnd(3NCURSES)
+                  border                  border(3NCURSES)
+                  border_set              border_set(3NCURSES)
+                  box                     border(3NCURSES)
+                  box_set                 border_set(3NCURSES)
+                  can_change_color        color(3NCURSES)
+                  cbreak                  inopts(3NCURSES)
+                  chgat                   attr(3NCURSES)
+                  clear                   clear(3NCURSES)
+                  clearok                 outopts(3NCURSES)
+                  clrtobot                clear(3NCURSES)
+                  clrtoeol                clear(3NCURSES)
+                  color_content           color(3NCURSES)
+                  color_set               attr(3NCURSES)
+                  copywin                 overlay(3NCURSES)
+                  curs_set                kernel(3NCURSES)
+                  curses_version          extensions(3NCURSES)*
+                  def_prog_mode           kernel(3NCURSES)
+                  def_shell_mode          kernel(3NCURSES)
+                  define_key              define_key(3NCURSES)*
+                  del_curterm             terminfo(3NCURSES)
+                  delay_output            util(3NCURSES)
+                  delch                   delch(3NCURSES)
+                  deleteln                deleteln(3NCURSES)
+                  delscreen               initscr(3NCURSES)
+                  delwin                  window(3NCURSES)
+                  derwin                  window(3NCURSES)
+                  doupdate                refresh(3NCURSES)
+                  dupwin                  window(3NCURSES)
+                  echo                    inopts(3NCURSES)
+                  echo_wchar              add_wch(3NCURSES)
+                  echochar                addch(3NCURSES)
+                  endwin                  initscr(3NCURSES)
+                  erase                   clear(3NCURSES)
+                  erasechar               termattrs(3NCURSES)
+                  erasewchar              termattrs(3NCURSES)
+                  filter                  util(3NCURSES)
+                  flash                   beep(3NCURSES)
+                  flushinp                util(3NCURSES)
+                  get_wch                 get_wch(3NCURSES)
+                  get_wstr                get_wstr(3NCURSES)
+                  getattrs                attr(3NCURSES)
+                  getbegx                 legacy(3NCURSES)*
+                  getbegy                 legacy(3NCURSES)*
+                  getbegyx                getyx(3NCURSES)
+                  getbkgd                 bkgd(3NCURSES)
+                  getbkgrnd               bkgrnd(3NCURSES)
+                  getcchar                getcchar(3NCURSES)
+                  getch                   getch(3NCURSES)
+                  getcurx                 legacy(3NCURSES)*
+                  getcury                 legacy(3NCURSES)*
+                  getmaxx                 legacy(3NCURSES)*
+                  getmaxy                 legacy(3NCURSES)*
+                  getmaxyx                getyx(3NCURSES)
+                  getmouse                mouse(3NCURSES)*
+                  getn_wstr               get_wstr(3NCURSES)
+                  getnstr                 getstr(3NCURSES)
+                  getparx                 legacy(3NCURSES)*
+
+                  getpary                 legacy(3NCURSES)*
+                  getparyx                getyx(3NCURSES)
+                  getstr                  getstr(3NCURSES)
+                  getsyx                  kernel(3NCURSES)
+                  getwin                  util(3NCURSES)
+                  getyx                   getyx(3NCURSES)
+                  halfdelay               inopts(3NCURSES)
+                  has_colors              color(3NCURSES)
+                  has_ic                  termattrs(3NCURSES)
+                  has_il                  termattrs(3NCURSES)
+                  has_key                 getch(3NCURSES)*
+                  hline                   border(3NCURSES)
+                  hline_set               border_set(3NCURSES)
+                  idcok                   outopts(3NCURSES)
+                  idlok                   outopts(3NCURSES)
+                  immedok                 outopts(3NCURSES)
+                  in_wch                  in_wch(3NCURSES)
+                  in_wchnstr              in_wchstr(3NCURSES)
+                  in_wchstr               in_wchstr(3NCURSES)
+                  inch                    inch(3NCURSES)
+                  inchnstr                inchstr(3NCURSES)
+                  inchstr                 inchstr(3NCURSES)
+                  init_color              color(3NCURSES)
+                  init_pair               color(3NCURSES)
+                  initscr                 initscr(3NCURSES)
+                  innstr                  instr(3NCURSES)
+                  innwstr                 inwstr(3NCURSES)
+                  ins_nwstr               ins_wstr(3NCURSES)
+                  ins_wch                 ins_wch(3NCURSES)
+                  ins_wstr                ins_wstr(3NCURSES)
+                  insch                   insch(3NCURSES)
+                  insdelln                deleteln(3NCURSES)
+                  insertln                deleteln(3NCURSES)
+                  insnstr                 insstr(3NCURSES)
+                  insstr                  insstr(3NCURSES)
+                  instr                   instr(3NCURSES)
+                  intrflush               inopts(3NCURSES)
+                  inwstr                  inwstr(3NCURSES)
+                  is_cleared              opaque(3NCURSES)*
+                  is_idcok                opaque(3NCURSES)*
+                  is_idlok                opaque(3NCURSES)*
+                  is_immedok              opaque(3NCURSES)*
+                  is_keypad               opaque(3NCURSES)*
+                  is_leaveok              opaque(3NCURSES)*
+                  is_linetouched          touch(3NCURSES)
+                  is_nodelay              opaque(3NCURSES)*
+                  is_notimeout            opaque(3NCURSES)*
+                  is_pad                  opaque(3NCURSES)*
+                  is_scrollok             opaque(3NCURSES)*
+                  is_subwin               opaque(3NCURSES)*
+                  is_syncok               opaque(3NCURSES)*
+                  is_term_resized         resizeterm(3NCURSES)*
+                  is_wintouched           touch(3NCURSES)
+                  isendwin                initscr(3NCURSES)
+                  key_defined             key_defined(3NCURSES)*
+                  key_name                util(3NCURSES)
+                  keybound                keybound(3NCURSES)*
+                  keyname                 util(3NCURSES)
+                  keyok                   keyok(3NCURSES)*
+                  keypad                  inopts(3NCURSES)
+                  killchar                termattrs(3NCURSES)
+                  killwchar               termattrs(3NCURSES)
+                  leaveok                 outopts(3NCURSES)
+                  longname                termattrs(3NCURSES)
+                  mcprint                 print(3NCURSES)*
+
+                  meta                    inopts(3NCURSES)
+                  mouse_trafo             mouse(3NCURSES)*
+                  mouseinterval           mouse(3NCURSES)*
+                  mousemask               mouse(3NCURSES)*
+                  move                    move(3NCURSES)
+                  mvadd_wch               add_wch(3NCURSES)
+                  mvadd_wchnstr           add_wchstr(3NCURSES)
+                  mvadd_wchstr            add_wchstr(3NCURSES)
+                  mvaddch                 addch(3NCURSES)
+                  mvaddchnstr             addchstr(3NCURSES)
+                  mvaddchstr              addchstr(3NCURSES)
+                  mvaddnstr               addstr(3NCURSES)
+                  mvaddnwstr              addwstr(3NCURSES)
+                  mvaddstr                addstr(3NCURSES)
+                  mvaddwstr               addwstr(3NCURSES)
+                  mvchgat                 attr(3NCURSES)
+                  mvcur                   terminfo(3NCURSES)
+                  mvdelch                 delch(3NCURSES)
+                  mvderwin                window(3NCURSES)
+                  mvget_wch               get_wch(3NCURSES)
+                  mvget_wstr              get_wstr(3NCURSES)
+                  mvgetch                 getch(3NCURSES)
+                  mvgetn_wstr             get_wstr(3NCURSES)
+                  mvgetnstr               getstr(3NCURSES)
+                  mvgetstr                getstr(3NCURSES)
+                  mvhline                 border(3NCURSES)
+                  mvhline_set             border_set(3NCURSES)
+                  mvin_wch                in_wch(3NCURSES)
+                  mvin_wchnstr            in_wchstr(3NCURSES)
+                  mvin_wchstr             in_wchstr(3NCURSES)
+                  mvinch                  inch(3NCURSES)
+                  mvinchnstr              inchstr(3NCURSES)
+                  mvinchstr               inchstr(3NCURSES)
+                  mvinnstr                instr(3NCURSES)
+                  mvinnwstr               inwstr(3NCURSES)
+                  mvins_nwstr             ins_wstr(3NCURSES)
+                  mvins_wch               ins_wch(3NCURSES)
+                  mvins_wstr              ins_wstr(3NCURSES)
+                  mvinsch                 insch(3NCURSES)
+                  mvinsnstr               insstr(3NCURSES)
+                  mvinsstr                insstr(3NCURSES)
+                  mvinstr                 instr(3NCURSES)
+                  mvinwstr                inwstr(3NCURSES)
+                  mvprintw                printw(3NCURSES)
+                  mvscanw                 scanw(3NCURSES)
+                  mvvline                 border(3NCURSES)
+                  mvvline_set             border_set(3NCURSES)
+                  mvwadd_wch              add_wch(3NCURSES)
+                  mvwadd_wchnstr          add_wchstr(3NCURSES)
+                  mvwadd_wchstr           add_wchstr(3NCURSES)
+                  mvwaddch                addch(3NCURSES)
+                  mvwaddchnstr            addchstr(3NCURSES)
+                  mvwaddchstr             addchstr(3NCURSES)
+                  mvwaddnstr              addstr(3NCURSES)
+                  mvwaddnwstr             addwstr(3NCURSES)
+                  mvwaddstr               addstr(3NCURSES)
+                  mvwaddwstr              addwstr(3NCURSES)
+                  mvwchgat                attr(3NCURSES)
+                  mvwdelch                delch(3NCURSES)
+                  mvwget_wch              get_wch(3NCURSES)
+                  mvwget_wstr             get_wstr(3NCURSES)
+                  mvwgetch                getch(3NCURSES)
+                  mvwgetn_wstr            get_wstr(3NCURSES)
+                  mvwgetnstr              getstr(3NCURSES)
+                  mvwgetstr               getstr(3NCURSES)
+
+                  mvwhline                border(3NCURSES)
+                  mvwhline_set            border_set(3NCURSES)
+                  mvwin                   window(3NCURSES)
+                  mvwin_wch               in_wch(3NCURSES)
+                  mvwin_wchnstr           in_wchstr(3NCURSES)
+                  mvwin_wchstr            in_wchstr(3NCURSES)
+                  mvwinch                 inch(3NCURSES)
+                  mvwinchnstr             inchstr(3NCURSES)
+                  mvwinchstr              inchstr(3NCURSES)
+                  mvwinnstr               instr(3NCURSES)
+                  mvwinnwstr              inwstr(3NCURSES)
+                  mvwins_nwstr            ins_wstr(3NCURSES)
+                  mvwins_wch              ins_wch(3NCURSES)
+                  mvwins_wstr             ins_wstr(3NCURSES)
+                  mvwinsch                insch(3NCURSES)
+                  mvwinsnstr              insstr(3NCURSES)
+                  mvwinsstr               insstr(3NCURSES)
+                  mvwinstr                instr(3NCURSES)
+                  mvwinwstr               inwstr(3NCURSES)
+                  mvwprintw               printw(3NCURSES)
+                  mvwscanw                scanw(3NCURSES)
+                  mvwvline                border(3NCURSES)
+                  mvwvline_set            border_set(3NCURSES)
+                  napms                   kernel(3NCURSES)
+                  newpad                  pad(3NCURSES)
+                  newterm                 initscr(3NCURSES)
+                  newwin                  window(3NCURSES)
+                  nl                      outopts(3NCURSES)
+                  nocbreak                inopts(3NCURSES)
+                  nodelay                 inopts(3NCURSES)
+                  noecho                  inopts(3NCURSES)
+                  nofilter                util(3NCURSES)*
+                  nonl                    outopts(3NCURSES)
+                  noqiflush               inopts(3NCURSES)
+                  noraw                   inopts(3NCURSES)
+                  notimeout               inopts(3NCURSES)
+                  overlay                 overlay(3NCURSES)
+                  overwrite               overlay(3NCURSES)
+                  pair_content            color(3NCURSES)
+                  pechochar               pad(3NCURSES)
+                  pnoutrefresh            pad(3NCURSES)
+                  prefresh                pad(3NCURSES)
+                  printw                  printw(3NCURSES)
+                  putp                    terminfo(3NCURSES)
+                  putwin                  util(3NCURSES)
+                  qiflush                 inopts(3NCURSES)
+                  raw                     inopts(3NCURSES)
+                  redrawwin               refresh(3NCURSES)
+                  refresh                 refresh(3NCURSES)
+                  reset_prog_mode         kernel(3NCURSES)
+                  reset_shell_mode        kernel(3NCURSES)
+                  resetty                 kernel(3NCURSES)
+                  resize_term             resizeterm(3NCURSES)*
+                  resizeterm              resizeterm(3NCURSES)*
+                  restartterm             terminfo(3NCURSES)
+                  ripoffline              kernel(3NCURSES)
+                  savetty                 kernel(3NCURSES)
+                  scanw                   scanw(3NCURSES)
+                  scr_dump                scr_dump(3NCURSES)
+                  scr_init                scr_dump(3NCURSES)
+                  scr_restore             scr_dump(3NCURSES)
+                  scr_set                 scr_dump(3NCURSES)
+                  scrl                    scroll(3NCURSES)
+                  scroll                  scroll(3NCURSES)
+                  scrollok                outopts(3NCURSES)
+
+                  set_curterm             terminfo(3NCURSES)
+                  set_term                initscr(3NCURSES)
+                  setcchar                getcchar(3NCURSES)
+                  setscrreg               outopts(3NCURSES)
+                  setsyx                  kernel(3NCURSES)
+                  setterm                 terminfo(3NCURSES)
+                  setupterm               terminfo(3NCURSES)
+                  slk_attr                slk(3NCURSES)*
+                  slk_attr_off            slk(3NCURSES)
+                  slk_attr_on             slk(3NCURSES)
+                  slk_attr_set            slk(3NCURSES)
+                  slk_attroff             slk(3NCURSES)
+                  slk_attron              slk(3NCURSES)
+                  slk_attrset             slk(3NCURSES)
+                  slk_clear               slk(3NCURSES)
+                  slk_color               slk(3NCURSES)
+                  slk_init                slk(3NCURSES)
+                  slk_label               slk(3NCURSES)
+                  slk_noutrefresh         slk(3NCURSES)
+                  slk_refresh             slk(3NCURSES)
+                  slk_restore             slk(3NCURSES)
+                  slk_set                 slk(3NCURSES)
+                  slk_touch               slk(3NCURSES)
+                  standend                attr(3NCURSES)
+                  standout                attr(3NCURSES)
+                  start_color             color(3NCURSES)
+                  subpad                  pad(3NCURSES)
+                  subwin                  window(3NCURSES)
+                  syncok                  window(3NCURSES)
+                  term_attrs              termattrs(3NCURSES)
+                  termattrs               termattrs(3NCURSES)
+                  termname                termattrs(3NCURSES)
+                  tgetent                 termcap(3NCURSES)
+                  tgetflag                termcap(3NCURSES)
+                  tgetnum                 termcap(3NCURSES)
+                  tgetstr                 termcap(3NCURSES)
+                  tgoto                   termcap(3NCURSES)
+                  tigetflag               terminfo(3NCURSES)
+                  tigetnum                terminfo(3NCURSES)
+                  tigetstr                terminfo(3NCURSES)
+                  tiparm                  terminfo(3NCURSES)*
+                  timeout                 inopts(3NCURSES)
+                  touchline               touch(3NCURSES)
+                  touchwin                touch(3NCURSES)
+                  tparm                   terminfo(3NCURSES)
+                  tputs                   termcap(3NCURSES)
+                  tputs                   terminfo(3NCURSES)
+                  trace                   trace(3NCURSES)*
+                  typeahead               inopts(3NCURSES)
+                  unctrl                  util(3NCURSES)
+                  unget_wch               get_wch(3NCURSES)
+                  ungetch                 getch(3NCURSES)
+                  ungetmouse              mouse(3NCURSES)*
+                  untouchwin              touch(3NCURSES)
+                  use_default_colors      default_colors(3NCURSES)*
+                  use_env                 util(3NCURSES)
+                  use_extended_names      extensions(3NCURSES)*
+                  use_legacy_coding       legacy_coding(3NCURSES)*
+                  use_tioctl              util(3NCURSES)
+                  vid_attr                terminfo(3NCURSES)
+                  vid_puts                terminfo(3NCURSES)
+                  vidattr                 terminfo(3NCURSES)
+                  vidputs                 terminfo(3NCURSES)
+                  vline                   border(3NCURSES)
+                  vline_set               border_set(3NCURSES)
+
+                  vw_printw               printw(3NCURSES)
+                  vw_scanw                scanw(3NCURSES)
+                  vwprintw                printw(3NCURSES)
+                  vwscanw                 scanw(3NCURSES)
+                  wadd_wch                add_wch(3NCURSES)
+                  wadd_wchnstr            add_wchstr(3NCURSES)
+                  wadd_wchstr             add_wchstr(3NCURSES)
+                  waddch                  addch(3NCURSES)
+                  waddchnstr              addchstr(3NCURSES)
+                  waddchstr               addchstr(3NCURSES)
+                  waddnstr                addstr(3NCURSES)
+                  waddnwstr               addwstr(3NCURSES)
+                  waddstr                 addstr(3NCURSES)
+                  waddwstr                addwstr(3NCURSES)
+                  wattr_get               attr(3NCURSES)
+                  wattr_off               attr(3NCURSES)
+                  wattr_on                attr(3NCURSES)
+                  wattr_set               attr(3NCURSES)
+                  wattroff                attr(3NCURSES)
+                  wattron                 attr(3NCURSES)
+                  wattrset                attr(3NCURSES)
+                  wbkgd                   bkgd(3NCURSES)
+                  wbkgdset                bkgd(3NCURSES)
+                  wbkgrnd                 bkgrnd(3NCURSES)
+                  wbkgrndset              bkgrnd(3NCURSES)
+                  wborder                 border(3NCURSES)
+                  wborder_set             border_set(3NCURSES)
+                  wchgat                  attr(3NCURSES)
+                  wclear                  clear(3NCURSES)
+                  wclrtobot               clear(3NCURSES)
+                  wclrtoeol               clear(3NCURSES)
+                  wcolor_set              attr(3NCURSES)
+                  wcursyncup              window(3NCURSES)
+                  wdelch                  delch(3NCURSES)
+                  wdeleteln               deleteln(3NCURSES)
+                  wecho_wchar             add_wch(3NCURSES)
+                  wechochar               addch(3NCURSES)
+                  wenclose                mouse(3NCURSES)*
+                  werase                  clear(3NCURSES)
+                  wget_wch                get_wch(3NCURSES)
+                  wget_wstr               get_wstr(3NCURSES)
+                  wgetbkgrnd              bkgrnd(3NCURSES)
+                  wgetch                  getch(3NCURSES)
+                  wgetdelay               opaque(3NCURSES)*
+                  wgetn_wstr              get_wstr(3NCURSES)
+                  wgetnstr                getstr(3NCURSES)
+                  wgetparent              opaque(3NCURSES)*
+                  wgetscrreg              opaque(3NCURSES)*
+                  wgetstr                 getstr(3NCURSES)
+                  whline                  border(3NCURSES)
+                  whline_set              border_set(3NCURSES)
+                  win_wch                 in_wch(3NCURSES)
+                  win_wchnstr             in_wchstr(3NCURSES)
+                  win_wchstr              in_wchstr(3NCURSES)
+                  winch                   inch(3NCURSES)
+                  winchnstr               inchstr(3NCURSES)
+                  winchstr                inchstr(3NCURSES)
+                  winnstr                 instr(3NCURSES)
+                  winnwstr                inwstr(3NCURSES)
+                  wins_nwstr              ins_wstr(3NCURSES)
+                  wins_wch                ins_wch(3NCURSES)
+                  wins_wstr               ins_wstr(3NCURSES)
+                  winsch                  insch(3NCURSES)
+                  winsdelln               deleteln(3NCURSES)
+                  winsertln               deleteln(3NCURSES)
+
+                  winsnstr                insstr(3NCURSES)
+                  winsstr                 insstr(3NCURSES)
+                  winstr                  instr(3NCURSES)
+                  winwstr                 inwstr(3NCURSES)
+                  wmouse_trafo            mouse(3NCURSES)*
+                  wmove                   move(3NCURSES)
+                  wnoutrefresh            refresh(3NCURSES)
+                  wprintw                 printw(3NCURSES)
+                  wredrawln               refresh(3NCURSES)
+                  wrefresh                refresh(3NCURSES)
+                  wresize                 wresize(3NCURSES)*
+                  wscanw                  scanw(3NCURSES)
+                  wscrl                   scroll(3NCURSES)
+                  wsetscrreg              outopts(3NCURSES)
+                  wstandend               attr(3NCURSES)
+                  wstandout               attr(3NCURSES)
+                  wsyncdown               window(3NCURSES)
+                  wsyncup                 window(3NCURSES)
+                  wtimeout                inopts(3NCURSES)
+                  wtouchln                touch(3NCURSES)
+                  wunctrl                 util(3NCURSES)
+                  wvline                  border(3NCURSES)
+                  wvline_set              border_set(3NCURSES)
+
+RETURN VALUE
+       Routines that return an integer return ERR upon failure and an  integer
+       value other than ERR upon successful completion, unless otherwise noted
+       in the routine descriptions.
+
+       As a general rule, routines check for null pointers passed  as  parame-
+       ters, and handle this as an error.
+
+       All  macros  return  the  value  of  the  w  version, except setscrreg,
+       wsetscrreg, getyx,  getbegyx,  and  getmaxyx.   The  return  values  of
+       setscrreg,  wsetscrreg,  getyx,  getbegyx,  and  getmaxyx are undefined
+       (i.e., these should not be used as the right-hand  side  of  assignment
+       statements).
+
+       Routines that return pointers return NULL on error.
+
+ENVIRONMENT
+       The  following  environment symbols are useful for customizing the run-
+       time behavior of the ncurses library.  The  most  important  ones  have
+       been already discussed in detail.
+
+   CC
+       When  set, change occurrences of the command_character (i.e., the cmdch
+       capability) of the loaded terminfo entries to the value of  this  vari-
+       able.  Very few terminfo entries provide this feature.
+
+       Because this name is also used in development environments to represent
+       the C compiler's name, ncurses ignores it if it does not happen to be a
+       single character.
+
+   BAUDRATE
+       The  debugging library checks this environment variable when the appli-
+       cation has redirected output to a file.  The variable's  numeric  value
+       is  used  for  the  baudrate.  If no value is found, ncurses uses 9600.
+       This allows testers to construct repeatable test-cases that  take  into
+       account costs that depend on baudrate.
+
+   COLUMNS
+       Specify the width of the screen in characters.  Applications running in
+       a windowing environment usually are able to obtain  the  width  of  the
+       window  in  which they are executing.  If neither the COLUMNS value nor
+       the terminal's screen size is available, ncurses uses  the  size  which
+       may be specified in the terminfo database (i.e., the cols capability).
+
+       It  is  important  that  your  application  use  a correct size for the
+       screen.  This is not always possible because your  application  may  be
+       running  on a host which does not honor NAWS (Negotiations About Window
+       Size), or because you are temporarily running as  another  user.   How-
+       ever,  setting  COLUMNS and/or LINES overrides the library's use of the
+       screen size obtained from the operating system.
+
+       Either COLUMNS or LINES symbols may be specified  independently.   This
+       is  mainly useful to circumvent legacy misfeatures of terminal descrip-
+       tions, e.g., xterm which commonly specifies a 65 line screen.  For best
+       results,  lines and cols should not be specified in a terminal descrip-
+       tion for terminals which are run as emulations.
+
+       Use the use_env function to disable all  use  of  external  environment
+       (but not including system calls) to determine the screen size.  Use the
+       use_tioctl function to update COLUMNS or LINES to match the screen size
+       obtained from system calls or the terminal database.
+
+   ESCDELAY
+       Specifies the total time, in milliseconds, for which ncurses will await
+       a character sequence, e.g., a function key.  The  default  value,  1000
+       milliseconds,  is enough for most uses.  However, it is made a variable
+       to accommodate unusual applications.
+
+       The most common instance where you may wish to change this value is  to
+       work  with  slow hosts, e.g., running on a network.  If the host cannot
+       read characters rapidly enough, it will have the same effect as if  the
+       terminal  did  not  send  characters  rapidly enough.  The library will
+       still see a timeout.
+
+       Note that xterm mouse events are  built  up  from  character  sequences
+       received from the xterm.  If your application makes heavy use of multi-
+       ple-clicking, you may wish to lengthen this default value  because  the
+       timeout  applies to the composed multi-click event as well as the indi-
+       vidual clicks.
+
+       In addition to the environment variable, this implementation provides a
+       global  variable  with the same name.  Portable applications should not
+       rely upon the presence of ESCDELAY in  either  form,  but  setting  the
+       environment  variable  rather  than the global variable does not create
+       problems when compiling an application.
+
+   HOME
+       Tells ncurses where your home directory is.  That is where it may  read
+       and write auxiliary terminal descriptions:
+
+       $HOME/.termcap
+       $HOME/.terminfo
+
+   LINES
+       Like COLUMNS, specify the height of the screen in characters.  See COL-
+       UMNS for a detailed description.
+
+   MOUSE_BUTTONS_123
+       This applies only to the OS/2 EMX port.  It specifies the order of but-
+       tons  on  the mouse.  OS/2 numbers a 3-button mouse inconsistently from
+       other platforms:
+
+       1 = left
+       2 = right
+       3 = middle.
+
+       This variable lets you customize the mouse.  The variable must be three
+       numeric digits 1-3 in any order, e.g., 123 or 321.  If it is not speci-
+       fied, ncurses uses 132.
+
+   NCURSES_ASSUMED_COLORS
+       Override the compiled-in assumption that the terminal's default  colors
+       are  white-on-black  (see  default_colors(3NCURSES)).   You may set the
+       foreground and background color values with this  environment  variable
+       by  proving  a  2-element list: foreground,background.  For example, to
+       tell ncurses to not assume anything  about  the  colors,  set  this  to
+       "-1,-1".   To  make  it  green-on-black, set it to "2,0".  Any positive
+       value from zero to the terminfo max_colors value is allowed.
+
+   NCURSES_CONSOLE2
+       This applies only to the MinGW port of ncurses.
+
+       The Console2 program's handling of the Microsoft Console API call  Cre-
+       ateConsoleScreenBuffer  is defective.  Applications which use this will
+       hang.  However, it is possible to simulate the action of this  call  by
+       mapping  coordinates,  explicitly  saving  and  restoring  the original
+       screen contents.  Setting the environment variable NCGDB has  the  same
+       effect.
+
+   NCURSES_GPM_TERMS
+       This applies only to ncurses configured to use the GPM interface.
+
+       If  present, the environment variable is a list of one or more terminal
+       names against which the TERM environment variable is matched.   Setting
+       it  to  an  empty  value disables the GPM interface; using the built-in
+       support for xterm, etc.
+
+       If the environment variable is absent, ncurses will attempt to open GPM
+       if TERM contains "linux".
+
+   NCURSES_NO_HARD_TABS
+       Ncurses  may  use tabs as part of the cursor movement optimization.  In
+       some cases, your terminal driver may not handle  these  properly.   Set
+       this  environment variable to disable the feature.  You can also adjust
+       your stty settings to avoid the problem.  NCURSES_NO_MAGIC_COOKIE  Some
+       terminals use a magic-cookie feature which requires special handling to
+       make highlighting and other video attributes display properly.  You can
+       suppress  the highlighting entirely for these terminals by setting this
+       environment variable.
+
+   NCURSES_NO_PADDING
+       Most of the terminal descriptions in the terminfo database are  written
+       for  real  "hardware"  terminals.   Many  people use terminal emulators
+       which run in a windowing environment and use curses-based applications.
+       Terminal  emulators  can  duplicate  all  of the important aspects of a
+       hardware terminal, but they do not  have  the  same  limitations.   The
+       chief  limitation  of  a  hardware terminal from the standpoint of your
+       application is the management of  dataflow,  i.e.,  timing.   Unless  a
+       hardware  terminal  is  interfaced  into a terminal concentrator (which
+       does flow control), it (or your application) must manage dataflow, pre-
+       venting overruns.  The cheapest solution (no hardware cost) is for your
+       program to do this by pausing after operations that the  terminal  does
+       slowly, such as clearing the display.
+
+       As  a  result,  many  terminal  descriptions (including the vt100) have
+       delay times embedded.  You may wish to use these descriptions, but  not
+       want to pay the performance penalty.
+
+       Set  the  NCURSES_NO_PADDING  environment  variable  to disable all but
+       mandatory padding.  Mandatory padding is used as a part of special con-
+       trol sequences such as flash.
+
+   NCURSES_NO_SETBUF
+       This setting is obsolete.  Before changes
+
+          ·   started with 5.9 patch 20120825 and
+
+          ·   continued though 5.9 patch 20130126
+
+       ncurses  enabled  buffered output during terminal initialization.  This
+       was done (as in SVr4 curses) for performance reasons.  For testing pur-
+       poses,  both of ncurses and certain applications, this feature was made
+       optional.   Setting  the  NCURSES_NO_SETBUF  variable  disabled  output
+       buffering,  leaving  the output in the original (usually line buffered)
+       mode.
+
+       In the current implementation, ncurses performs its own  buffering  and
+       does  not require this workaround.  It does not modify the buffering of
+       the standard output.
+
+       The reason for the change was to make the behavior for  interrupts  and
+       other  signals  more  robust.   One drawback is that certain nonconven-
+       tional programs would mix ordinary stdio calls with ncurses  calls  and
+       (usually)  work.  This is no longer possible since ncurses is not using
+       the buffered standard output but its  own  output  (to  the  same  file
+       descriptor).  As a special case, the low-level calls such as putp still
+       use the standard output.  But high-level curses calls do not.
+
+   NCURSES_NO_UTF8_ACS
+       During initialization, the ncurses library  checks  for  special  cases
+       where VT100 line-drawing (and the corresponding alternate character set
+       capabilities) described in  the  terminfo  are  known  to  be  missing.
+       Specifically,  when running in a UTF-8 locale, the Linux console emula-
+       tor and the GNU screen program ignore these.  Ncurses checks  the  TERM
+       environment  variable  for  these.  For other special cases, you should
+       set this environment variable.  Doing this tells ncurses to use Unicode
+       values  which  correspond to the VT100 line-drawing glyphs.  That works
+       for the special cases cited, and is likely to work for terminal  emula-
+       tors.
+
+       When setting this variable, you should set it to a nonzero value.  Set-
+       ting it to zero (or to a nonnumber)  disables  the  special  check  for
+       "linux" and "screen".
+
+       As  an  alternative  to the environment variable, ncurses checks for an
+       extended terminfo capability U8.  This is a  numeric  capability  which
+       can be compiled using tic -x.  For example
+
+          # linux console, if patched to provide working
+          # VT100 shift-in/shift-out, with corresponding font.
+          linux-vt100|linux console with VT100 line-graphics,
+                  U8#0, use=linux,
+
+          # uxterm with vt100Graphics resource set to false
+          xterm-utf8|xterm relying on UTF-8 line-graphics,
+                  U8#1, use=xterm,
+
+       The  name  "U8" is chosen to be two characters, to permit it to be used
+       by applications that use ncurses' termcap interface.
+
+   NCURSES_TRACE
+       During  initialization,  the  ncurses  debugging  library  checks   the
+       NCURSES_TRACE  environment  variable.   If  it is defined, to a numeric
+       value, ncurses calls the trace function, using that value as the  argu-
+       ment.
+
+       The  argument  values,  which  are defined in curses.h, provide several
+       types of information.  When running with traces enabled, your  applica-
+       tion will write the file trace to the current directory.
+
+       See curs_trace(3X) for more information.
+
+   TERM
+       Denotes  your  terminal  type.   Each terminal type is distinct, though
+       many are similar.
+
+       TERM is commonly set by terminal emulators to help applications find  a
+       workable terminal description.  Some of those choose a popular approxi-
+       mation, e.g., “ansi”, “vt100”, “xterm” rather than an exact  fit.   Not
+       infrequently,  your  application will have problems with that approach,
+       e.g., incorrect function-key definitions.
+
+       If you set TERM in your environment, it has no effect on the  operation
+       of  the  terminal  emulator.  It only affects the way applications work
+       within the terminal.  Likewise, as a general rule (xterm being  a  rare
+       exception),  terminal  emulators  which  allow you to specify TERM as a
+       parameter or configuration value do not change their behavior to  match
+       that setting.
+
+   TERMCAP
+       If  the  ncurses  library  has  been  configured  with termcap support,
+       ncurses will check for a terminal's description in termcap form  if  it
+       is not available in the terminfo database.
+
+       The TERMCAP environment variable contains either a terminal description
+       (with newlines stripped out), or a file name telling where the informa-
+       tion  denoted by the TERM environment variable exists.  In either case,
+       setting it directs ncurses to ignore the usual place for this  informa-
+       tion, e.g., /etc/termcap.
+
+   TERMINFO
+       Overrides  the  directory  in  which ncurses searches for your terminal
+       description.  This is the simplest, but not the only way to change  the
+       list  of  directories.   The complete list of directories in order fol-
+       lows:
+
+          ·   the last directory to which ncurses wrote, if any,  is  searched
+              first
+
+          ·   the directory specified by the TERMINFO environment variable
+
+          ·   $HOME/.terminfo
+
+          ·   directories listed in the TERMINFO_DIRS environment variable
+
+          ·   one  or more directories whose names are configured and compiled
+              into the ncurses library, i.e.,
+
+             ·   no default value (corresponding to  the  TERMINFO_DIRS  vari-
+                 able)
+
+             ·   /usr/share/terminfo (corresponding to the TERMINFO variable)
+
+   TERMINFO_DIRS
+       Specifies  a  list  of directories to search for terminal descriptions.
+       The list is separated by colons (i.e., ":") on Unix, semicolons on OS/2
+       EMX.
+
+       All  of the terminal descriptions are in terminfo form.  Normally these
+       are stored in a directory tree, using subdirectories named by the first
+       letter of the terminal names therein.
+
+       If  ncurses  is  built  with a hashed database, then each entry in this
+       list can also be the path of the corresponding database file.
+
+       If ncurses is built with a support for reading termcap files  directly,
+       then an entry in this list may be the path of a termcap file.
+
+   TERMPATH
+       If  TERMCAP  does not hold a file name then ncurses checks the TERMPATH
+       environment variable.  This is a list of filenames separated by  spaces
+       or colons (i.e., ":") on Unix, semicolons on OS/2 EMX.
+
+       If  the  TERMPATH environment variable is not set, ncurses looks in the
+       files /etc/termcap, /usr/share/misc/termcap and $HOME/.termcap, in that
+       order.
+
+       The library may be configured to disregard the following variables when
+       the current user is the superuser (root), or if  the  application  uses
+       setuid or setgid permissions:
+
+       $TERMINFO, $TERMINFO_DIRS, $TERMPATH, as well as $HOME.
+
+ALTERNATE CONFIGURATIONS
+       Several different configurations are possible, depending on the config-
+       ure script options used when building ncurses.  There are  a  few  main
+       options  whose  effects are visible to the applications developer using
+       ncurses:
+
+       --disable-overwrite
+            The standard include for ncurses is as noted in SYNOPSIS:
+
+          #include <ncurses/curses.h>
+
+            This option is used to avoid filename conflicts  when  ncurses  is
+            not the main implementation of curses of the computer.  If ncurses
+            is installed disabling overwrite, it puts its headers in a  subdi-
+            rectory, e.g.,
+
+          #include <ncurses/curses.h>
+
+            It  also  omits  a  symbolic  link  which  would  allow you to use
+            -lcurses to build executables.
+
+       --enable-widec
+            The configure script  renames  the  library  and  (if  the  --dis-
+            able-overwrite  option is used) puts the header files in a differ-
+            ent subdirectory.  All of the library names have a "w" appended to
+            them, i.e., instead of
+
+          -lncurses
+
+            you link with
+
+          -lncursesw
+
+            You must also define _XOPEN_SOURCE_EXTENDED when compiling for the
+            wide-character library to use the extended (wide-character)  func-
+            tions.   The curses.h file which is installed for the wide-charac-
+            ter library is designed to be compatible with the normal library's
+            header.   Only  the size of the WINDOW structure differs, and very
+            few applications require more than a pointer to WINDOWs.   If  the
+            headers  are  installed  allowing  overwrite,  the  wide-character
+            library's headers should be installed last, to allow  applications
+            to be built using either library from the same set of headers.
+
+       --with-pthread
+            The  configure  script  renames  the  library.  All of the library
+            names have a "t"  appended  to  them  (before  any  "w"  added  by
+            --enable-widec).
+
+            The global variables such as LINES are replaced by macros to allow
+            read-only access.  At the same time, setter-functions are provided
+            to  set  these  values.   Some applications (very few) may require
+            changes to work with this convention.
+
+       --with-shared
+
+       --with-normal
+
+       --with-debug
+
+       --with-profile
+            The shared and normal (static) library names differ by their  suf-
+            fixes,  e.g.,  libncurses.so and libncurses.a.  The debug and pro-
+            filing libraries add a "_g" and a "_p" to the root  names  respec-
+            tively, e.g., libncurses_g.a and libncurses_p.a.
+
+       --with-trace
+            The  trace  function normally resides in the debug library, but it
+            is sometimes useful to configure this in the shared library.  Con-
+            figure  scripts  should  check for the function's existence rather
+            than assuming it is always in the debug library.
+
+FILES
+       /usr/share/tabset
+            directory containing initialization files for the  terminal  capa-
+            bility database /usr/share/terminfo terminal capability database
+
+SEE ALSO
+       terminfo(5)  and  related  pages whose names begin "curs_" for detailed
+       routine descriptions.
+       curses_variables(3NCURSES)
+
+EXTENSIONS
+       The ncurses library can be compiled with an option (-DUSE_GETCAP)  that
+       falls  back  to  the  old-style /etc/termcap file if the terminal setup
+       code cannot find a terminfo entry corresponding to TERM.  Use  of  this
+       feature  is not recommended, as it essentially includes an entire term-
+       cap compiler in the ncurses startup code, at significant cost  in  core
+       and startup cycles.
+
+       The  ncurses  library includes facilities for capturing mouse events on
+       certain terminals (including xterm).  See  the  mouse(3NCURSES)  manual
+       page for details.
+
+       The ncurses library includes facilities for responding to window resiz-
+       ing   events,   e.g.,   when   running   in   an   xterm.    See    the
+       resizeterm(3NCURSES)  and  wresize(3NCURSES)  manual pages for details.
+       In addition, the library may be configured with a SIGWINCH handler.
+
+       The ncurses library extends the fixed set of function key  capabilities
+       of  terminals by allowing the application designer to define additional
+       key   sequences   at    runtime.     See    the    define_key(3NCURSES)
+       key_defined(3NCURSES), and keyok(3NCURSES) manual pages for details.
+
+       The  ncurses  library  can  exploit the capabilities of terminals which
+       implement the ISO-6429 SGR 39 and  SGR  49  controls,  which  allow  an
+       application  to reset the terminal to its original foreground and back-
+       ground colors.  From the users' perspective, the application is able to
+       draw  colored  text  on  a background whose color is set independently,
+       providing better control over color contrasts.   See  the  default_col-
+       ors(3NCURSES) manual page for details.
+
+       The  ncurses library includes a function for directing application out-
+       put  to  a  printer  attached  to  the  terminal   device.    See   the
+       print(3NCURSES) manual page for details.
+
+PORTABILITY
+       The  ncurses  library  is intended to be BASE-level conformant with XSI
+       Curses.  The EXTENDED XSI Curses functionality  (including  color  sup-
+       port) is supported.
+
+       A  small  number  of local differences (that is, individual differences
+       between the XSI Curses and ncurses calls) are described in  PORTABILITY
+       sections of the library man pages.
+
+       Unlike other implementations, this one checks parameters such as point-
+       ers to WINDOW structures to ensure they are not null.  The main  reason
+       for  providing this behavior is to guard against programmer error.  The
+       standard interface does not provide a way for the library  to  tell  an
+       application which of several possible errors were detected.  Relying on
+       this (or some other) extension will adversely affect the portability of
+       curses applications.
+
+       This implementation also contains several extensions:
+
+       ·   The routine has_key is not part of XPG4, nor is it present in SVr4.
+           See the getch(3NCURSES) manual page for details.
+
+       ·   The routine slk_attr is not part of XPG4,  nor  is  it  present  in
+           SVr4.  See the slk(3NCURSES) manual page for details.
+
+       ·   The  routines  getmouse,  mousemask, ungetmouse, mouseinterval, and
+           wenclose relating to mouse interfacing are not part  of  XPG4,  nor
+           are  they present in SVr4.  See the mouse(3NCURSES) manual page for
+           details.
+
+       ·   The routine mcprint was not present in any previous  curses  imple-
+           mentation.  See the print(3NCURSES) manual page for details.
+
+       ·   The routine wresize is not part of XPG4, nor is it present in SVr4.
+           See the wresize(3NCURSES) manual page for details.
+
+       ·   The WINDOW structure's internal details can be hidden from applica-
+           tion   programs.    See  opaque(3NCURSES)  for  the  discussion  of
+           is_scrollok, etc.
+
+       ·   This implementation can be configured to provide  rudimentary  sup-
+           port  for  multi-threaded  applications.  See threads(3NCURSES) for
+           details.
+
+       ·   This implementation can also be configured  to  provide  a  set  of
+           functions  which  improve  the  ability to manage multiple screens.
+           See sp_funcs(3NCURSES) for details.
+
+       In historic curses versions, delays embedded in  the  capabilities  cr,
+       ind,  cub1,  ff  and tab activated corresponding delay bits in the UNIX
+       tty driver.  In this implementation, all padding is done by sending NUL
+       bytes.   This method is slightly more expensive, but narrows the inter-
+       face to the UNIX  kernel  significantly  and  increases  the  package's
+       portability correspondingly.
+
+NOTES
+       The  header  file  <curses.h>  automatically  includes the header files
+       <stdio.h> and <unctrl.h>.
+
+       If standard output from a ncurses program is re-directed  to  something
+       which  is not a tty, screen updates will be directed to standard error.
+       This was an undocumented feature of AT&T System V Release 3 curses.
+
+AUTHORS
+       Zeyd M. Ben-Halim, Eric S. Raymond, Thomas E. Dickey.  Based on pcurses
+       by Pavel Curtis.
+
+
+
+                                                             ncurses(3NCURSES)
