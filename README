@@ -1,4 +1,6 @@
-# CPE_2016_getnextline
+# getnextline_2016
 
-Ce projet à pour but de lire un fichier texte et de récupérer celui-ci ligne par ligne
-// man de curse pour les tests //
+Ce projet à pour but de lire un fichier texte et 
+de récupérer celui-ci ligne par ligne à chaque appel de get_next_line()
+
+// man de curse pour les tests.
